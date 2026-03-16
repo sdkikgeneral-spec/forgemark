@@ -138,3 +138,15 @@ ForgeMarkは、MarkdownだけでUIスケルトンを記述し、VS Code拡張で
 - D8-10: next-shadcn出力
 - D11-12: tailwind-plain追加
 - D13-14: サンプル3画面、README、デモ仕上げ
+
+## Repository
+
+- GitHub: <https://github.com/sdkikgeneral-spec/forgemark>
+- License: MIT
+
+## Branch Strategy
+- `main`: リリース済みの安定版（直接 push 禁止）
+- `develop`: 開発統合ブランチ（現在の作業ブランチ）
+- `feature/{name}`: 機能開発（develop からブランチ → develop へ PR）
+- `fix/{name}`: バグ修正
+- `docs/{name}`: ドキュメント修正
