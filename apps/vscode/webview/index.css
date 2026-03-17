@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+/* webview 背景を VS Code のエディタ背景に合わせる */
+body {
+  background-color: var(--vscode-editor-background, #1e1e1e);
+  color: var(--vscode-editor-foreground, #d4d4d4);
+  margin: 0;
+  padding: 0;
+}
+
+#root {
+  padding: 16px;
+}
