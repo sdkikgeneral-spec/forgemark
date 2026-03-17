@@ -69,21 +69,21 @@ code --install-extension forgemark.forgemark
 code --install-extension forgemark-0.1.0.vsix
 ```
 
-### 2. サンプルを開く
+### 2. リポジトリを clone して拡張を起動する
 
 ```bash
-git clone https://github.com/your-org/forgemark
+git clone https://github.com/sdkikgeneral-spec/forgemark
 cd forgemark
-code examples/login/main.md
+npm install
+code .
 ```
 
-VS Code が起動したら、右上の「ForgeMark: プレビュー」ボタンをクリックします。
-左にエディタ、右にプレビューが並んで表示されます。
+VS Code で `F5` を押すと拡張デバッグホストが起動します。
+`.fm.md` ファイルを開くと右ペインに自動でプレビューが表示されます。
 
-### 3. コードを生成する
+### 3. コードを生成する（今後実装予定）
 
-エディタ上で右クリック → **「コードへ変換」** → ターゲット（`next-shadcn` など）を選択します。
-差分エディタで内容を確認し、「適用」を押すと `./generated/` にファイルが書き出されます。
+コード生成（`next-shadcn` / `tailwind-plain` / `sveltekit`）は Phase 4 以降で実装予定です。
 
 ---
 
@@ -195,57 +195,29 @@ path: ./components/Content.md
 
 ---
 
-## ForgeMark Studio（ノードグラフエディタ）
-
-Markdown を書かずに、ビジュアルなノードグラフで ForgeMark の UI ツリーを組み立てられる Web アプリです。
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  ForgeMark Studio              [Import .fm.md] [Export] │
-├──────┬──────────────────────────────────────┬───────────┤
-│Nodes │                                      │Properties │
-│      │  [Screen:ログイン]                    │           │
-│Screen│    └──[Card:ログインフォーム]          │ type:email│
-│Card  │         ├──[Input:email]              │ required:☑│
-│Row   │         ├──[Input:password]           │           │
-│Input │         └──[Button:サインイン]         │           │
-│Button│                                      │           │
-├──────┴──────────────────────────────────────┴───────────┤
-│  Generated ForgeMark Markdown                           │
-└─────────────────────────────────────────────────────────┘
-```
-
-### 起動方法
-
-```bash
-npm install
-cd apps/studio
-npx vite
-# → http://localhost:5173 を開く
-```
-
-### 機能
-
-| 機能 | 説明 |
-| --- | --- |
-| **ノードパレット** | 左サイドバーからクリックでキャンバスに追加 |
-| **エッジ接続** | ノード同士をドラッグ接続して親子関係を構築 |
-| **プロパティ編集** | 右サイドバーで選択ノードの属性をフォーム編集 |
-| **Markdown生成** | 下部パネルに ForgeMark Markdown をリアルタイム表示 |
-| **Import** | `.fm.md` ファイルを読み込んでグラフ化 |
-| **Export** | グラフを `.fm.md` ファイルとして書き出し |
-
-### 技術スタック
-
-- **@xyflow/react** — ノードグラフ UI
-- **Vite + React** — ビルド & UI フレームワーク
-- **Tailwind CSS v4** — スタイリング
-- **Zustand** — グラフ状態管理
-- **@forgemark/core** — パーサー・AST（ソースを直接参照）
-
----
-
 ## 開発
+
+### リポジトリ構成
+
+```
+forgemark/
+├── packages/
+│   ├── core/          ← パーサー・AST・依存グラフ（@forgemark/core）
+│   └── renderer/      ← React プレビューレンダラー（@forgemark/renderer）
+└── apps/
+    └── vscode/        ← VS Code 拡張（拡張ホスト + webview）
+```
+
+### 実装状況
+
+| フェーズ | 内容 | 状況 |
+| --- | --- | --- |
+| Phase 1 | パーサー / include / 依存グラフ | ✅ 完了（232 tests passing） |
+| Phase 2 | VS Code webview プレビュー基盤 | ✅ 完了（保存時更新） |
+| Phase 3 | IDE 機能（補完・ジャンプ・lint・リネーム） | 🔲 未着手 |
+| Phase 4 | コード生成（next-shadcn） | 🔲 未着手 |
+| Phase 5 | コード生成（tailwind-plain / sveltekit） | 🔲 未着手 |
+| Phase 6 | サンプル 3 画面・デモ仕上げ | 🔲 未着手 |
 
 ### 要件・仕様
 
