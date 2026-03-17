@@ -25,14 +25,14 @@ function checkNodesRecursively(
   diagnostics: Diagnostic[],
 ): void {
   for (const node of nodes) {
-    // Row内のblock includeチェック
+    // Row内のblock includeチェック (FM006)
     if (node.type === "Row") {
       for (const column of node.columns) {
         for (const child of column) {
           if (child.type === "Include" && child.as === "block") {
             diagnostics.push({
-              code: DIAGNOSTIC_CODES.STRUCTURAL_ERROR,
-              message: `Block include inside Row column. Use 'as: inline' for includes inside Row`,
+              code: DIAGNOSTIC_CODES.BLOCK_IN_ROW,
+              message: `Inline include required inside Row (use as: inline)`,
               severity: "warning",
               filePath,
               range: {
@@ -45,11 +45,11 @@ function checkNodesRecursively(
       }
     }
 
-    // UnknownノードはH3位置不正を示す可能性がある
+    // UnknownノードはH3位置不正を示す可能性がある (FM007)
     if (node.type === "Unknown" && node.raw.startsWith("### ")) {
       diagnostics.push({
-        code: DIAGNOSTIC_CODES.STRUCTURAL_ERROR,
-        message: `H3 heading '${node.raw}' used outside a valid parent context (MenuBar, Panes, Tabs, Accordion, Grid)`,
+        code: DIAGNOSTIC_CODES.H3_OUTSIDE_CONTEXT,
+        message: `H3 is only valid inside a MenuBar/Tabs/Accordion/Panes/Grid (## {.menubar/.tabs/...})`,
         severity: "warning",
         filePath,
         range: {

@@ -14,7 +14,7 @@
  * 9. table → Table
  */
 
-import type { Root, RootContent, Code, Heading, Paragraph, List, ListItem, ThematicBreak, Image, Table as MdTable } from "mdast";
+import type { Root, RootContent, Code, Heading, Paragraph, List, ListItem, ThematicBreak, Image, Table as MdTable, Position as MdastPosition } from "mdast";
 import { toString as mdastToString } from "mdast-util-to-string";
 import { parseAttrBlock } from "./attrParser.js";
 import { parseInlineElements } from "./inlineParser.js";
@@ -32,7 +32,7 @@ import {
   extractAlertVariant,
   extractGridCols,
 } from "./headingMapper.js";
-import { parseCanonicalInclude } from "../include/canonicalParser.js";
+import { parseCanonicalIncludeWithWarnings } from "../include/canonicalParser.js";
 import { parseSugarInclude } from "../include/sugarParser.js";
 import { replaceEscapes, restoreEscapes } from "./escapeHandler.js";
 import type {
@@ -160,14 +160,44 @@ function processCode(node: Code, state: PluginState): void {
 /**
  * Includeブロックをパースする
  * 正規形（フェンスドYAML）と糖衣形（1行）を判別して処理する
+ * unknownKeys・fallbackRaw・position をノードにセットする
  */
 function parseIncludeBlock(node: Code): IncludeNode | null {
-  // 糖衣形: meta属性にキーバリューが含まれる
+  let includeNode: IncludeNode | null;
+
   if (node.meta && node.value.trim() === "") {
-    return parseSugarInclude(node.meta);
+    // 糖衣形: meta属性にキーバリューが含まれる
+    includeNode = parseSugarInclude(node.meta);
+  } else {
+    // 正規形: コードブロック内容を解析（未知キー警告も取得）
+    const result = parseCanonicalIncludeWithWarnings(node.value);
+    includeNode = result.node;
   }
-  // 正規形: コードブロック内容を解析
-  return parseCanonicalInclude(node.value);
+
+  if (includeNode && node.position) {
+    // mdast の position を AST ノードに引き継ぐ
+    includeNode = { ...includeNode, position: toAstPosition(node.position) };
+  }
+
+  return includeNode;
+}
+
+/**
+ * mdast の Position を ForgeMark AST の Position に変換する
+ */
+function toAstPosition(pos: MdastPosition): import("../ast/types.js").Position {
+  return {
+    start: {
+      line: pos.start.line,
+      column: pos.start.column,
+      offset: pos.start.offset ?? 0,
+    },
+    end: {
+      line: pos.end.line,
+      column: pos.end.column,
+      offset: pos.end.offset ?? 0,
+    },
+  };
 }
 
 /**
@@ -181,14 +211,21 @@ function processHeading(node: Heading, state: PluginState): void {
       // H1 → Screen（新しいコンテキストを開始）
       flushContextStack(state);
       const screenBase = mapH1ToScreen(text);
-      const screenNode: ScreenNode = { ...screenBase, children: [] };
+      const screenNode: ScreenNode = {
+        ...screenBase,
+        children: [],
+        position: node.position ? toAstPosition(node.position) : undefined,
+      };
       state.contextStack.push({ nodeType: "Screen", node: screenNode });
       break;
     }
     case 2: {
       // H2 → Card または昇格ノード
       const { type, label, classes, attrs, events, dir } = mapH2ToNode(text);
-      const h2Node = buildH2Node(type, label, classes, attrs, events, dir);
+      const h2Base = buildH2Node(type, label, classes, attrs, events, dir);
+      const h2Node = h2Base && node.position
+        ? { ...h2Base, position: toAstPosition(node.position) }
+        : h2Base;
       if (h2Node) {
         // Screen内のH2はScreenのchildrenに追加
         // Screen外のH2は直接rootに追加
@@ -209,13 +246,16 @@ function processHeading(node: Heading, state: PluginState): void {
         mapH3ToNode(text, parentType);
 
       if (h3Type) {
-        const h3Node = buildH3Node(
+        const h3Base = buildH3Node(
           h3Type,
           h3Label,
           h3Classes,
           h3Attrs,
           h3Dir,
         );
+        const h3Node = h3Base && node.position
+          ? { ...h3Base, position: toAstPosition(node.position) }
+          : h3Base;
         if (h3Node) {
           // 前の同レベルH3コンテキストをフラッシュ
           const top = state.contextStack[state.contextStack.length - 1];
@@ -233,6 +273,7 @@ function processHeading(node: Heading, state: PluginState): void {
             class: [],
             dir: "auto",
             raw: `### ${text}`,
+            position: node.position ? toAstPosition(node.position) : undefined,
           } satisfies UnknownNode,
           state,
         );
@@ -248,6 +289,7 @@ function processHeading(node: Heading, state: PluginState): void {
           class: [],
           dir: "auto",
           content: text,
+          position: node.position ? toAstPosition(node.position) : undefined,
         } satisfies TextNode,
         state,
       );
@@ -263,11 +305,16 @@ function processParagraph(node: Paragraph, state: PluginState): void {
   const escaped = replaceEscapes(text);
   const restored = restoreEscapes(escaped);
 
+  const nodePos = node.position ? toAstPosition(node.position) : undefined;
+
   // Row記法: [[ A | B ]]
   if (isRowSyntax(restored)) {
     const rowNode = parseRowSyntax(restored);
     if (rowNode) {
-      appendToCurrentContext(rowNode, state);
+      appendToCurrentContext(
+        { ...rowNode, position: nodePos },
+        state,
+      );
       return;
     }
   }
@@ -276,7 +323,8 @@ function processParagraph(node: Paragraph, state: PluginState): void {
   const inlineNodes = parseInlineElements(restored);
   if (inlineNodes.length > 0) {
     for (const n of inlineNodes) {
-      appendToCurrentContext(n, state);
+      // 段落内の複数インライン要素は同じ段落位置を共有する
+      appendToCurrentContext({ ...n, position: nodePos }, state);
     }
     return;
   }
@@ -285,7 +333,7 @@ function processParagraph(node: Paragraph, state: PluginState): void {
   for (const child of node.children) {
     if (child.type === "image") {
       const imgNode = processImage(child as Image);
-      appendToCurrentContext(imgNode, state);
+      appendToCurrentContext({ ...imgNode, position: nodePos }, state);
       return;
     }
   }
@@ -298,6 +346,7 @@ function processParagraph(node: Paragraph, state: PluginState): void {
       class: [],
       dir: "auto",
       content: restoreEscapes(text),
+      position: nodePos,
     } satisfies TextNode,
     state,
   );
@@ -778,6 +827,7 @@ function flushContextStack(state: PluginState): void {
 
 /**
  * スタックの最上位フレームをポップして親に追加する
+ * appendNodeToFrame（インライン追加）とは分離した専用関数で二重追加を防ぐ
  */
 function flushTopFrame(state: PluginState): void {
   const frame = state.contextStack.pop();
@@ -785,21 +835,67 @@ function flushTopFrame(state: PluginState): void {
 
   const parent = state.contextStack[state.contextStack.length - 1];
   if (parent) {
-    appendNodeToFrame(frame.node, parent);
-    // MenuBarのMenusへの追加
-    if (parent.node.type === "MenuBar" && frame.node.type === "Menu") {
-      (parent.node as MenuBarNode).menus.push(frame.node as MenuNode);
-    } else if (parent.node.type === "Tabs" && frame.node.type === "Tab") {
-      (parent.node as TabsNode).tabs.push(frame.node as TabNode);
-    } else if (parent.node.type === "Accordion" && frame.node.type === "AccordionItem") {
-      (parent.node as AccordionNode).items.push(frame.node as AccordionItemNode);
-    } else if (parent.node.type === "Panes" && frame.node.type === "Pane") {
-      (parent.node as PanesNode).panes.push(frame.node as PaneNode);
-    } else if (parent.node.type === "Grid" && frame.node.type === "GridCell") {
-      (parent.node as GridNode).cells.push(frame.node as GridCellNode);
-    }
+    addChildToParentFrame(frame.node, parent);
   } else {
     state.nodes.push(frame.node);
+  }
+}
+
+/**
+ * フラッシュ時専用の親への追加関数
+ * コンテナ型ごとの適切な配列に追加する
+ * appendNodeToFrame（インライン追加）と分けることで二重追加バグを構造的に防ぐ
+ */
+function addChildToParentFrame(child: AstNode, parent: ContextFrame): void {
+  switch (parent.node.type) {
+    case "Screen":
+      (parent.node as ScreenNode).children.push(child);
+      break;
+    case "Card":
+      (parent.node as CardNode).children.push(child);
+      break;
+    case "Alert":
+      (parent.node as AlertNode).children.push(child);
+      break;
+    case "Pane":
+      (parent.node as PaneNode).children.push(child);
+      break;
+    case "Tab":
+      (parent.node as TabNode).children.push(child);
+      break;
+    case "AccordionItem":
+      (parent.node as AccordionItemNode).children.push(child);
+      break;
+    case "GridCell":
+      (parent.node as GridCellNode).children.push(child);
+      break;
+    case "MenuBar":
+      if (child.type === "Menu") {
+        (parent.node as MenuBarNode).menus.push(child as MenuNode);
+      }
+      break;
+    case "Tabs":
+      if (child.type === "Tab") {
+        (parent.node as TabsNode).tabs.push(child as TabNode);
+      }
+      break;
+    case "Accordion":
+      if (child.type === "AccordionItem") {
+        (parent.node as AccordionNode).items.push(child as AccordionItemNode);
+      }
+      break;
+    case "Panes":
+      if (child.type === "Pane") {
+        (parent.node as PanesNode).panes.push(child as PaneNode);
+      }
+      break;
+    case "Grid":
+      if (child.type === "GridCell") {
+        (parent.node as GridNode).cells.push(child as GridCellNode);
+      }
+      break;
+    default:
+      break;
   }
 }
 

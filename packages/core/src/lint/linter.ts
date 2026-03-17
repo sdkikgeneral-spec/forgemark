@@ -7,6 +7,7 @@
 
 import type { AstNode } from "../ast/types.js";
 import type { Diagnostic } from "./types.js";
+import { checkUnknownKeys } from "./rules/unknownKey.js";
 import { checkInvalidValues } from "./rules/invalidValue.js";
 import { checkUnsupportedEvents } from "./rules/unsupportedEvent.js";
 import { checkStructuralRules } from "./rules/structuralRules.js";
@@ -23,6 +24,7 @@ export function runLintRules(
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
+  diagnostics.push(...checkUnknownKeys(nodes, filePath));
   diagnostics.push(...checkInvalidValues(nodes, filePath));
   diagnostics.push(...checkUnsupportedEvents(nodes, filePath));
   diagnostics.push(...checkStructuralRules(nodes, filePath));

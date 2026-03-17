@@ -202,24 +202,25 @@ describe("include エッジケース", () => {
 
 describe("lint-10: 未知キー（checkUnknownKeys）", () => {
   it("未知キーが警告 FM001 として報告される（lint-10）", () => {
-    const content = "path: ./foo.md\nunknownKey: someValue\nas: block\n";
-    const { unknownKeys } = parseCanonicalIncludeWithWarnings(content);
+    // parseMarkdown 経由で include ブロックを解析し、FM001 が発火することを確認する
+    const source = "```include\npath: ./foo.md\nunknownKey: someValue\nas: block\n```";
+    const result = parseMarkdown(source, "test.md");
 
-    // unknownKeys に nodeIndex を付与してチェック
-    const keysWithIndex = unknownKeys.map((k, i) => ({ ...k, nodeIndex: i }));
-    const diagnostics = checkUnknownKeys([], "test.md", keysWithIndex);
-
-    expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]?.code).toBe(DIAGNOSTIC_CODES.UNKNOWN_KEY);
-    expect(diagnostics[0]?.message).toContain("unknownKey");
-    expect(diagnostics[0]?.severity).toBe("warning");
+    const fm001 = result.diagnostics.filter(
+      (d) => d.code === DIAGNOSTIC_CODES.UNKNOWN_KEY,
+    );
+    expect(fm001).toHaveLength(1);
+    expect(fm001[0]?.message).toContain("unknownKey");
+    expect(fm001[0]?.severity).toBe("warning");
   });
 
-  it("既知キーのみなら診断なし", () => {
-    const content = "path: ./foo.md\nas: block\ndir: auto\n";
-    const { unknownKeys } = parseCanonicalIncludeWithWarnings(content);
-    const diagnostics = checkUnknownKeys([], "test.md", []);
-    expect(unknownKeys).toHaveLength(0);
-    expect(diagnostics).toHaveLength(0);
+  it("既知キーのみなら診断なし（lint-10）", () => {
+    const source = "```include\npath: ./foo.md\nas: block\ndir: auto\n```";
+    const result = parseMarkdown(source, "test.md");
+
+    const fm001 = result.diagnostics.filter(
+      (d) => d.code === DIAGNOSTIC_CODES.UNKNOWN_KEY,
+    );
+    expect(fm001).toHaveLength(0);
   });
 });

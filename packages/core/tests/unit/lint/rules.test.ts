@@ -23,7 +23,7 @@ describe("checkInvalidValues", () => {
       children: [],
     };
     const diagnostics = checkInvalidValues([pane], FILE_PATH);
-    expect(diagnostics.some((d) => d.code === DIAGNOSTIC_CODES.LINT_WARNING)).toBe(true);
+    expect(diagnostics.some((d) => d.code === DIAGNOSTIC_CODES.PANE_SIZE_CONFLICT)).toBe(true);
   });
 
   it("正常なPaneノードは警告なし", () => {
@@ -91,7 +91,7 @@ describe("checkStructuralRules", () => {
       columns: [[includeNode]],
     };
     const diagnostics = checkStructuralRules([row], FILE_PATH);
-    expect(diagnostics.some((d) => d.code === DIAGNOSTIC_CODES.STRUCTURAL_ERROR)).toBe(true);
+    expect(diagnostics.some((d) => d.code === DIAGNOSTIC_CODES.BLOCK_IN_ROW)).toBe(true);
   });
 
   it("Row内のinline includeは警告なし", () => {

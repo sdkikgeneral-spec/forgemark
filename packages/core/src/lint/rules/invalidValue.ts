@@ -74,11 +74,11 @@ function checkNodesRecursively(
       });
     }
 
-    // Pane flex/w競合チェック
+    // Pane flex/w 競合チェック (FM008)
     if (node.type === "Pane" && node.flex !== undefined && node.w !== undefined) {
       diagnostics.push({
-        code: DIAGNOSTIC_CODES.LINT_WARNING,
-        message: `Pane has both 'flex' and 'w' specified. 'flex' and 'w' are mutually exclusive`,
+        code: DIAGNOSTIC_CODES.PANE_SIZE_CONFLICT,
+        message: `Cannot specify both 'flex' and 'w'/'h' on the same Pane`,
         severity: "warning",
         filePath,
         range: {

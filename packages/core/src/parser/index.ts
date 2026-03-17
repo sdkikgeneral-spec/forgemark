@@ -31,14 +31,13 @@ export interface ParseResult {
 export function parseMarkdown(source: string, filePath: string): ParseResult {
   // unified + remark-parse + remark-gfm でMarkdown ASTを構築
   // remark-gfm はGFMテーブル構文のサポートに必要
-  const processor = unified().use(remarkParse).use(remarkGfm);
-  const mdast = processor.parse(source);
+  const rawNodes = buildAstNodes(source);
 
-  // mdastをForgeMark UI ASTに変換
-  const rawNodes = transformMdastToAst(mdast);
+  // fallbackRaw を持つ Include ノードのフォールバックを解析する
+  const nodesWithFallback = resolveFallbackRaw(rawNodes);
 
   // IDを採番
-  const nodes = assignIds(rawNodes);
+  const nodes = assignIds(nodesWithFallback);
 
   // includeノードを収集
   const includes = collectIncludes(nodes);
@@ -47,6 +46,70 @@ export function parseMarkdown(source: string, filePath: string): ParseResult {
   const diagnostics = runLintRules(nodes, filePath);
 
   return { nodes, diagnostics, includes };
+}
+
+/**
+ * Markdown文字列をUI ASTノード配列に変換する（lint・ID採番なし）
+ * フォールバックコンテンツのパースに使用する
+ */
+function buildAstNodes(source: string): AstNode[] {
+  const processor = unified().use(remarkParse).use(remarkGfm);
+  const mdast = processor.parse(source);
+  return transformMdastToAst(mdast);
+}
+
+/**
+ * Include ノードの fallbackRaw を再帰的に解析して fallback ASTに変換する
+ * 変換後は fallbackRaw を削除する（一時フィールドのため）
+ */
+function resolveFallbackRaw(nodes: AstNode[]): AstNode[] {
+  return nodes.map((node) => {
+    if (node.type === "Include") {
+      if (node.fallbackRaw !== undefined) {
+        const fallbackNodes = buildAstNodes(node.fallbackRaw);
+        // fallbackRaw を消費して fallback ASTをセット
+        const { fallbackRaw: _consumed, ...rest } = node;
+        return { ...rest, fallback: assignIds(fallbackNodes) } as IncludeNode;
+      }
+      // fallback がある場合は子ノードも再帰処理
+      if (node.fallback && node.fallback.length > 0) {
+        return { ...node, fallback: resolveFallbackRaw(node.fallback) };
+      }
+      return node;
+    }
+
+    // 子ノードを持つ型を再帰処理
+    return resolveChildFallbacks(node);
+  });
+}
+
+/**
+ * 子ノードを持つ型の fallbackRaw を再帰的に解決する
+ */
+function resolveChildFallbacks(node: AstNode): AstNode {
+  switch (node.type) {
+    case "Screen":
+      return { ...node, children: resolveFallbackRaw(node.children) };
+    case "Card":
+      return { ...node, children: resolveFallbackRaw(node.children) };
+    case "Row":
+      return {
+        ...node,
+        columns: node.columns.map((col) => resolveFallbackRaw(col)),
+      };
+    case "Alert":
+      return { ...node, children: resolveFallbackRaw(node.children) };
+    case "Pane":
+      return { ...node, children: resolveFallbackRaw(node.children) };
+    case "Tab":
+      return { ...node, children: resolveFallbackRaw(node.children) };
+    case "AccordionItem":
+      return { ...node, children: resolveFallbackRaw(node.children) };
+    case "GridCell":
+      return { ...node, children: resolveFallbackRaw(node.children) };
+    default:
+      return node;
+  }
 }
 
 /**

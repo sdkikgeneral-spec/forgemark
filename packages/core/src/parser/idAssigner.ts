@@ -1,7 +1,10 @@
 /**
  * ID採番・衝突解消
- * ASTノードに {nodeType}-{index} 形式のIDを付与する
- * include展開後の重複IDには `-{suffix}` を付与する
+ * - position が利用可能な場合: `{nodeType}-L{line}` 形式の安定 ID を付与する
+ * - position が未設定の場合: `{nodeType}-{index}` 形式のフォールバック ID を付与する
+ *
+ * 安定 ID により、ファイル先頭へのノード挿入で後続 ID が変動する問題を解消する。
+ * include 展開後の重複 ID には `-{suffix}` を付与して解消する。
  */
 
 import type { AstNode } from "../ast/types.js";
@@ -9,7 +12,7 @@ import type { AstNode } from "../ast/types.js";
 /**
  * ASTノード配列にIDを付与する（再帰的に処理）
  * @param nodes - ID未付与のASTノード配列
- * @param counter - 型ごとのカウンター（外部から渡す場合は衝突解消に使用）
+ * @param counter - 型ごとのカウンター（positionなしノードのフォールバック用）
  * @returns ID付与済みのノード配列（元配列を変更しない）
  */
 export function assignIds(
@@ -25,10 +28,18 @@ export function assignIds(
  */
 function assignIdToNode(node: AstNode, counter: Map<string, number>): AstNode {
   const typeLower = node.type.toLowerCase();
-  const count = counter.get(typeLower) ?? 0;
-  counter.set(typeLower, count + 1);
+  let id: string;
 
-  const id = `${typeLower}-${count}`;
+  if (node.position) {
+    // 位置情報ベースの安定ID（先頭挿入で後続IDが変わらない）
+    id = `${typeLower}-L${node.position.start.line}`;
+  } else {
+    // フォールバック: 出現順インデックス
+    const count = counter.get(typeLower) ?? 0;
+    counter.set(typeLower, count + 1);
+    id = `${typeLower}-${count}`;
+  }
+
   const updated = { ...node, id };
 
   // 子ノードの再帰処理
@@ -195,6 +206,10 @@ function resolveNodeConflict(node: AstNode, existingIds: Set<string>): AstNode {
   return processChildrenWithConflictCheck(updated, existingIds);
 }
 
+/**
+ * 全コンテナ型の子ノードを再帰的に衝突チェックする
+ * processChildren と同じ網羅範囲を維持する
+ */
 function processChildrenWithConflictCheck(
   node: AstNode,
   existingIds: Set<string>,
@@ -206,6 +221,143 @@ function processChildrenWithConflictCheck(
         children: resolveIdConflicts(node.children, existingIds),
       };
     case "Card":
+      return {
+        ...node,
+        children: resolveIdConflicts(node.children, existingIds),
+      };
+    case "Row":
+      return {
+        ...node,
+        columns: node.columns.map((col) => resolveIdConflicts(col, existingIds)),
+      };
+    case "Include":
+      return {
+        ...node,
+        fallback: node.fallback
+          ? resolveIdConflicts(node.fallback, existingIds)
+          : undefined,
+      };
+    case "MenuBar":
+      return {
+        ...node,
+        menus: node.menus.map(
+          (m) => resolveNodeConflict(m, existingIds) as typeof m,
+        ),
+      };
+    case "Menu":
+      return {
+        ...node,
+        items: node.items.map(
+          (item) => resolveNodeConflict(item, existingIds) as typeof item,
+        ),
+      };
+    case "Breadcrumb":
+      return {
+        ...node,
+        items: node.items.map(
+          (item) => resolveNodeConflict(item, existingIds) as typeof item,
+        ),
+      };
+    case "Tree":
+      return {
+        ...node,
+        items: node.items.map(
+          (item) => resolveNodeConflict(item, existingIds) as typeof item,
+        ),
+      };
+    case "TreeItem":
+      return {
+        ...node,
+        children: node.children.map(
+          (child) => resolveNodeConflict(child, existingIds) as typeof child,
+        ),
+      };
+    case "Panes":
+      return {
+        ...node,
+        panes: node.panes.map(
+          (pane) => resolveNodeConflict(pane, existingIds) as typeof pane,
+        ),
+      };
+    case "Pane":
+      return {
+        ...node,
+        children: resolveIdConflicts(node.children, existingIds),
+      };
+    case "RadioGroup":
+      return {
+        ...node,
+        items: node.items.map(
+          (item) => resolveNodeConflict(item, existingIds) as typeof item,
+        ),
+      };
+    case "Tabs":
+      return {
+        ...node,
+        tabs: node.tabs.map(
+          (tab) => resolveNodeConflict(tab, existingIds) as typeof tab,
+        ),
+      };
+    case "Tab":
+      return {
+        ...node,
+        children: resolveIdConflicts(node.children, existingIds),
+      };
+    case "Accordion":
+      return {
+        ...node,
+        items: node.items.map(
+          (item) => resolveNodeConflict(item, existingIds) as typeof item,
+        ),
+      };
+    case "AccordionItem":
+      return {
+        ...node,
+        children: resolveIdConflicts(node.children, existingIds),
+      };
+    case "Dropdown":
+      return {
+        ...node,
+        items: node.items.map(
+          (item) => resolveNodeConflict(item, existingIds) as typeof item,
+        ),
+      };
+    case "Listbox":
+      return {
+        ...node,
+        items: node.items.map(
+          (item) => resolveNodeConflict(item, existingIds) as typeof item,
+        ),
+      };
+    case "Toolbar":
+      return {
+        ...node,
+        groups: node.groups.map((group) =>
+          group.map(
+            (item) => resolveNodeConflict(item, existingIds) as typeof item,
+          ),
+        ),
+      };
+    case "StatusBar":
+      return {
+        ...node,
+        items: node.items.map(
+          (item) => resolveNodeConflict(item, existingIds) as typeof item,
+        ),
+      };
+    case "Alert":
+      return {
+        ...node,
+        children: resolveIdConflicts(node.children, existingIds),
+      };
+    case "Grid":
+      return {
+        ...node,
+        cells: node.cells.map(
+          (cell) => resolveNodeConflict(cell, existingIds) as typeof cell,
+        ),
+      };
+    case "GridCell":
       return {
         ...node,
         children: resolveIdConflicts(node.children, existingIds),

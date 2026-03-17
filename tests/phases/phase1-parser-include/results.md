@@ -1,7 +1,7 @@
 # Phase 1 — テスト結果
 
 **フェーズ**: D1–D2 パーサー / include / 依存グラフ
-**最終更新**: 2026-03-17
+**最終更新**: 2026-03-17（spec_review 指摘対応・バグ修正後）
 **実行環境**: Node 24.14.0 / Vitest 1.6.1
 
 ---
@@ -30,6 +30,21 @@ Test Files  17 passed (17)
 | BUG-02 | `src/include/normalizer.ts` | `SUGAR_INCLUDE_PATTERN` の `\s+` が改行にもマッチし、正規形フェンスを糖衣形と誤判定 | `\s+` → `[ \t]+` に変更し改行を除外 |
 | BUG-03 | `src/parser/remarkPlugin.ts` | Dropdown内の `---` セパレーター（ThematicBreak）が無視される | `appendNodeToFrame` に `Menu` / `Dropdown` ケースを追加し `MenuSeparator` を `items` に追記 |
 | BUG-04 | `src/parser/remarkPlugin.ts` | Select/Combobox直後のリストがoptionsに変換されない（SelectはcontextStackに積まれない） | `processList` で親フレームの最後の子ノードを確認し、Select/Comboboxの場合にoptionsをセット |
+| BUG-05 | `src/lint/linter.ts` | `checkUnknownKeys`（FM001）が `runLintRules` から呼び出されておらず、include の未知キーが一切診断されなかった | `linter.ts` に `checkUnknownKeys` の import と呼び出しを追加 |
+| BUG-06 | `src/parser/idAssigner.ts` | `resolveIdConflicts` の `processChildrenWithConflictCheck` が Screen/Card のみ対応で、Row・MenuBar・Tree・Panes 等の include 展開後 ID 衝突が解消されなかった | 全コンテナ型（Row/MenuBar/Menu/Tree/TreeItem/Panes/Pane/RadioGroup/Tabs/Tab/Accordion/AccordionItem/Dropdown/Listbox/Toolbar/StatusBar/Alert/Grid/GridCell）へ拡張 |
+| BUG-07 | `src/include/canonicalParser.ts` | フォールバックコンテンツ（`---` 以降）が `[]` に捨てられており、実際に解析されなかった | `fallbackRaw` フィールドに生文字列を保持し、`parser/index.ts` で `buildAstNodes()` により ASTへ変換 |
+| BUG-08 | `src/parser/remarkPlugin.ts` | `flushTopFrame` が `appendNodeToFrame`（インライン追加）と同一関数を呼んだ後、重複して if チェーンを実行する構造（将来の二重追加バグリスク） | `addChildToParentFrame` を新設し、フラッシュ専用の単一 switch に統合。`appendNodeToFrame` はインライン追加専用として分離 |
+
+### spec_review 指摘対応（本実行後に実施）
+
+| 対応ID | 対象ファイル | 内容 |
+| --- | --- | --- |
+| DESIGN-01 | `src/parser/idAssigner.ts` | ID 戦略を position ベース安定ID（`{type}-L{line}`）に移行。先頭挿入でも後続IDが変動しない |
+| DESIGN-02 | `src/lint/types.ts` | FM007 `LINT_WARNING` を FM006 `BLOCK_IN_ROW` / FM007 `H3_OUTSIDE_CONTEXT` / FM008 `PANE_SIZE_CONFLICT` に分割 |
+| DESIGN-03 | `src/include/sugarParser.ts` | 糖衣形の未知キーも `unknownKeys` に収集するよう対応 |
+| DESIGN-04 | `src/ast/types.ts` | `@mvp-core` / `@mvp-extended` ラベルでスコープ区分けを明示 |
+| DESIGN-05 | `src/include/pathResolver.ts` | `http://`, `https://`, `file:` 等の URL/プロトコル形式パスを `isOutsideWorkspace: true` で拒否 |
+| DESIGN-06 | `src/parser/remarkPlugin.ts` | H1/H2/H3/paragraph/code の全 mdast ノードに `position` を付与し、差分レンダリングの準備を完了 |
 
 ### 設計上の制約（WONTFIX）
 
@@ -86,7 +101,7 @@ Test Files  17 passed (17)
 | `parser-menu-04` | MenuItem: disabled | PASS | `components.test > Menu 詳細 > MenuItem: disabled` |
 | `parser-menu-05` | MenuBar: アクセラレーター | PASS | `components.test > Menu 詳細 > MenuBar: アクセラレーター` |
 | `parser-menu-06` 〜 `parser-menu-11` | Menu詳細（サブメニュー等） | TODO | |
-| `parser-id-01` | id採番: Screen/Card/Button | PASS | `idAssigner.test > 各ノードに {type}-{index} 形式のIDを付与する`, `parse-to-ast.test > 全ノードにIDが付与される` |
+| `parser-id-01` | id採番: Screen/Card/Button | PASS | position 有り → `{type}-L{line}` 安定ID。position 無し → `{type}-{index}` フォールバック。`idAssigner.test > 各ノードに {type}-{index} 形式のIDを付与する`（フォールバック検証）、`parse-to-ast.test > 全ノードにIDが付与される（position ベース安定ID）` |
 | `parser-id-02` | id採番: 複数ファイル | PASS | `idAssigner.test > resolveIdConflicts > include展開後のID衝突を解消する（SC-31: p1-id-01）` |
 | `parser-id-03` | id採番: 3ファイル競合 | PASS | `edge-cases.test > 3ファイル間のID衝突 → サフィックス -1,-2 で解消` |
 
@@ -239,7 +254,7 @@ Test Files  17 passed (17)
 | `p1-id-03` | id衝突: 3ファイル | PASS | `edge-cases.test > 3ファイル間のID衝突 → サフィックス -1,-2 で解消` |
 | `p1-diamond-01` | ダイヤモンド依存（循環なし） | PASS | `cycleDetector.test > ダイヤモンド依存（SC-32: p1-diamond-01）では循環なし` |
 | `p1-diamond-02` | ダイヤモンド依存後のD変更 | PASS | `dependencyGraph.test > ダイヤモンド依存でDが変更された場合A/B/C全てに影響する（SC-32: p1-diamond-02）` |
-| `p1-fb-01` | フォールバックコンテンツ認識 | PASS | `edge-cases.test > --- 以降のコンテンツを持つ include → fallback が空配列` |
+| `p1-fb-01` | フォールバックコンテンツ認識 | PASS | `edge-cases.test > --- 以降のコンテンツを持つ include → fallback が空配列`（BUG-07 修正後: `fallbackRaw` が保存され `parser/index.ts` でASTに変換。フォールバック内容があれば `fallback: AstNode[]` が生成される） |
 | `p1-fb-02` | フォールバックなしの include | PASS | `edge-cases.test > --- なし の include → fallback は undefined` |
 | `graph-update-01` | グラフ: ノード追加 | PASS | `dependencyGraph.test > update > 新しいノードを追加できる` |
 | `graph-update-02` | グラフ: 依存エッジ設定 | PASS | `dependencyGraph.test > update > 依存エッジを正しく設定する` |
@@ -252,16 +267,16 @@ Test Files  17 passed (17)
 | `graph-topo-02` | トポロジカルソート: 全ノード含む | PASS | `topoSort.test > 全ノードを含む` |
 | `graph-topo-03` | トポロジカルソート: ダイヤモンド依存 | PASS | `topoSort.test > ダイヤモンド依存でDが最初に来る` |
 | `graph-topo-04` | トポロジカルソート: 循環でも無限ループなし | PASS | `topoSort.test > 循環があっても無限ループしない` |
-| `lint-01` | lint: Pane flex+w 競合警告 | PASS | `lint/rules.test > checkInvalidValues > Pane の flex と w の競合を警告する` |
+| `lint-01` | lint: Pane flex+w 競合警告 | PASS | `lint/rules.test > checkInvalidValues > Pane の flex と w の競合を警告する` — コード FM008 `PANE_SIZE_CONFLICT`（旧 FM007 `LINT_WARNING` から変更） |
 | `lint-02` | lint: 正常Pane 警告なし | PASS | `lint/rules.test > checkInvalidValues > 正常なPaneノードは警告なし` |
 | `lint-03` | lint: on:hover 未サポートイベント | PASS | `lint/rules.test > checkUnsupportedEvents > on:hover は未サポートイベントとして警告する` |
 | `lint-04` | lint: on:click 正常 | PASS | `lint/rules.test > checkUnsupportedEvents > on:click は正常` |
-| `lint-05` | lint: Row内block include警告 | PASS | `lint/rules.test > checkStructuralRules > Row内のblock includeに警告する` |
+| `lint-05` | lint: Row内block include警告 | PASS | `lint/rules.test > checkStructuralRules > Row内のblock includeに警告する` — コード FM006 `BLOCK_IN_ROW`（旧 FM006 `STRUCTURAL_ERROR` から分割） |
 | `lint-06` | lint: Row内inline include 正常 | PASS | `lint/rules.test > checkStructuralRules > Row内のinline includeは警告なし` |
 | `lint-07` | lint: 循環参照エラー報告（2ファイル） | PASS | `lint/rules.test > checkCircularIncludes > 循環参照をerrorとして報告する` |
 | `lint-08` | lint: 循環なし → 診断なし | PASS | `lint/rules.test > checkCircularIncludes > 循環なしのグラフは診断なし` |
 | `lint-09` | lint: 循環パスが全関連ファイルに報告 | PASS | `lint/rules.test > checkCircularIncludes > 循環パスが全関連ファイルに報告される` |
-| `lint-10` | lint: 未知キー警告（include） | PASS | `edge-cases.test > lint-10: 未知キー（checkUnknownKeys）> 未知キーが警告 FM001 として報告される` |
+| `lint-10` | lint: 未知キー警告（include） | PASS | `edge-cases.test > lint-10: 未知キー（checkUnknownKeys）> 未知キーが警告 FM001 として報告される`（BUG-05 修正後: `parseMarkdown` 経由で FM001 が正しく発火するよう統合テストに変更） |
 
 ---
 
