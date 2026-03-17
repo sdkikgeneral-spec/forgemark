@@ -98,9 +98,8 @@ export function parseCanonicalIncludeWithWarnings(
 
   if (!path) return { node: null, unknownKeys };
 
-  // フォールバックコンテンツは文字列として保持（後でパーサーが処理）
-  // Phase 1ではフォールバックの解析は簡略化
-  const fallbackContent =
+  // フォールバックの生Markdown文字列を保持（parser/index.ts で ASTへ変換する）
+  const fallbackRaw =
     fallbackStart >= 0 ? lines.slice(fallbackStart).join("\n") : undefined;
 
   const node: IncludeNode = {
@@ -111,8 +110,10 @@ export function parseCanonicalIncludeWithWarnings(
     path,
     as,
     resolved: false,
-    // フォールバックは後でパーサーが変換する（Phase 1では空配列）
-    fallback: fallbackContent !== undefined ? [] : undefined,
+    // fallback は parser/index.ts が fallbackRaw を解析後にセットする
+    fallback: fallbackRaw !== undefined ? [] : undefined,
+    fallbackRaw,
+    unknownKeys: unknownKeys.length > 0 ? unknownKeys.map((w) => w.key) : undefined,
   };
 
   return { node, unknownKeys };

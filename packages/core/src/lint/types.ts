@@ -42,11 +42,20 @@ export interface Diagnostic {
 
 /** lintルールコード一覧 */
 export const DIAGNOSTIC_CODES = {
+  /** includeブロックの未知キー */
   UNKNOWN_KEY: "FM001",
+  /** 属性値の不正値（dir, as 等） */
   INVALID_VALUE: "FM002",
+  /** 存在しないincludeパス */
   MISSING_PATH: "FM003",
+  /** includeの循環参照 */
   CIRCULAR_INCLUDE: "FM004",
+  /** 未サポートイベント（on:hover 等） */
   UNSUPPORTED_EVENT: "FM005",
-  STRUCTURAL_ERROR: "FM006",
-  LINT_WARNING: "FM007",
+  /** Row内にblock includeが使われている */
+  BLOCK_IN_ROW: "FM006",
+  /** 有効な親コンテキスト外でH3が使われている */
+  H3_OUTSIDE_CONTEXT: "FM007",
+  /** Paneに flex と w/h が同時指定されている */
+  PANE_SIZE_CONFLICT: "FM008",
 } as const;

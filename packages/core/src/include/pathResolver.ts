@@ -17,6 +17,9 @@ export interface PathResolveResult {
   exists: boolean;
 }
 
+/** URL/プロトコル形式のパスパターン（例: http://, file://, ftp://） */
+const URL_PROTOCOL_RE = /^[a-zA-Z][a-zA-Z0-9+\-.]*:\/\//;
+
 /**
  * includeパスを解決・正規化する
  * @param includePath - include記述内のパス（例: "./components/../Btn.md"）
@@ -28,6 +31,15 @@ export function resolvePath(
   fromFilePath: string,
   workspaceRoot: string,
 ): PathResolveResult {
+  // URL形式・file:プロトコルを拒否（ワークスペース外の安全境界）
+  if (URL_PROTOCOL_RE.test(includePath) || includePath.startsWith("file:")) {
+    return {
+      normalizedPath: includePath,
+      isOutsideWorkspace: true,
+      exists: false,
+    };
+  }
+
   // 記述元ファイルのディレクトリを基準に絶対パスを計算
   const fromDir = path.dirname(path.resolve(workspaceRoot, fromFilePath));
   const absolutePath = path.resolve(fromDir, includePath);

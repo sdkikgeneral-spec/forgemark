@@ -138,17 +138,19 @@ describe("parseMarkdown - 統合テスト", () => {
   });
 
   describe("IDの採番", () => {
-    it("全ノードにIDが付与される", () => {
+    it("全ノードにIDが付与される（position ベース安定ID）", () => {
+      // position ベースID: {type}-L{line} 形式
+      // # /test → line 1, ## カード → line 3, [ボタン] → line 5
       const result = parseMarkdown(
         "# /test\n\n## カード {.card}\n\n[ボタン]{.btn}",
         "test.md",
       );
       const screen = result.nodes[0];
-      expect(screen?.id).toBe("screen-0");
+      expect(screen?.id).toBe("screen-L1");
       if (screen?.type === "Screen") {
-        expect(screen.children[0]?.id).toBe("card-0");
+        expect(screen.children[0]?.id).toBe("card-L3");
         if (screen.children[0]?.type === "Card") {
-          expect(screen.children[0].children[0]?.id).toBe("button-0");
+          expect(screen.children[0].children[0]?.id).toBe("button-L5");
         }
       }
     });

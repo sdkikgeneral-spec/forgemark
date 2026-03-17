@@ -26,7 +26,7 @@ export interface BaseNode {
   position?: Position;
 }
 
-// ─── コア要素（9種） ───────────────────────────────────────────────────────
+// ─── コア要素（9種）@mvp-core ─────────────────────────────────────────────
 
 /** H1 → 画面ルートノード */
 export interface ScreenNode extends BaseNode {
@@ -88,6 +88,16 @@ export interface IncludeNode extends BaseNode {
   fallback?: AstNode[];
   /** パス解決済みフラグ（グラフ構築後に設定） */
   resolved: boolean;
+  /**
+   * パース時に検出した未知キー（lint用の一時フィールド）
+   * runLintRules 実行後は参照しない
+   */
+  unknownKeys?: string[];
+  /**
+   * フォールバックの生Markdown文字列（parseMarkdown内でASTに変換後にundefinedになる）
+   * canonicalParser が設定し、parser/index.ts が消費する一時フィールド
+   */
+  fallbackRaw?: string;
 }
 
 /** 水平区切り線（--- が MenuBar/Toolbar 外に現れた場合） */
@@ -102,7 +112,7 @@ export interface UnknownNode extends BaseNode {
   raw: string;
 }
 
-// ─── メニュー/ナビゲーション（6種） ──────────────────────────────────────
+// ─── メニュー/ナビゲーション（6種）@mvp-extended ──────────────────────────
 
 /** ## {.menubar} → メニューバー */
 export interface MenuBarNode extends BaseNode {
@@ -146,7 +156,7 @@ export interface BreadcrumbItemNode extends BaseNode {
   events?: Record<string, string>;
 }
 
-// ─── ツリー/ペイン（4種） ─────────────────────────────────────────────────
+// ─── ツリー/ペイン（4種）@mvp-extended ───────────────────────────────────
 
 /** ## {.tree} → ツリービュー */
 export interface TreeNode extends BaseNode {
@@ -188,7 +198,7 @@ export interface PaneNode extends BaseNode {
   children: AstNode[];
 }
 
-// ─── フォーム・選択（8種） ────────────────────────────────────────────────
+// ─── フォーム・選択（8種）@mvp-extended ──────────────────────────────────
 
 /** [x] label → チェックボックス */
 export interface CheckboxNode extends BaseNode {
@@ -279,7 +289,7 @@ export interface ToggleNode extends BaseNode {
   name?: string;
 }
 
-// ─── UIコンポーネント（15種） ─────────────────────────────────────────────
+// ─── UIコンポーネント（15種）@mvp-extended ───────────────────────────────
 
 /** ## {.tabs} → タブパネル */
 export interface TabsNode extends BaseNode {
@@ -383,7 +393,7 @@ export interface StatusItemNode extends BaseNode {
   events?: Record<string, string>;
 }
 
-// ─── メディア・表示（6種） ────────────────────────────────────────────────
+// ─── メディア・表示（6種）@mvp-extended ──────────────────────────────────
 
 /** [___]{type:progress} → プログレスバー */
 export interface ProgressNode extends BaseNode {
@@ -429,7 +439,7 @@ export interface BadgeNode extends BaseNode {
   label: string;
 }
 
-// ─── レイアウト・テーブル（3種） ──────────────────────────────────────────
+// ─── レイアウト・テーブル（3種）@mvp-extended ─────────────────────────────
 
 /** ## label {.grid} → グリッドレイアウト */
 export interface GridNode extends BaseNode {

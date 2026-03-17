@@ -8,19 +8,27 @@ import type { IncludeNode } from "../ast/types.js";
 /** 糖衣形のキーバリュー属性パターン */
 const SUGAR_ATTR_PATTERN = /(\w+)="([^"]*)"/g;
 
+/** 糖衣形でサポートされるキー */
+const SUPPORTED_SUGAR_KEYS = new Set(["path", "as", "dir", "class"]);
+
 /**
  * 糖衣形includeのメタ文字列を解析してIncludeNodeを返す
  * @param meta - コードフェンスのmetaプロパティ（例: 'path="./foo.md" as="inline"'）
  */
 export function parseSugarInclude(meta: string): IncludeNode | null {
   const attrs: Record<string, string> = {};
+  const unknownKeys: string[] = [];
 
   let match: RegExpExecArray | null;
   SUGAR_ATTR_PATTERN.lastIndex = 0;
   while ((match = SUGAR_ATTR_PATTERN.exec(meta)) !== null) {
     const key = match[1] ?? "";
     const value = match[2] ?? "";
-    if (key) attrs[key] = value;
+    if (!key) continue;
+    attrs[key] = value;
+    if (!SUPPORTED_SUGAR_KEYS.has(key)) {
+      unknownKeys.push(key);
+    }
   }
 
   if (!attrs["path"]) return null;
@@ -50,5 +58,6 @@ export function parseSugarInclude(meta: string): IncludeNode | null {
     path,
     as,
     resolved: false,
+    unknownKeys: unknownKeys.length > 0 ? unknownKeys : undefined,
   };
 }
