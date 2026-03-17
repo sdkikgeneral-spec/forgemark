@@ -195,6 +195,56 @@ path: ./components/Content.md
 
 ---
 
+## ForgeMark Studio（ノードグラフエディタ）
+
+Markdown を書かずに、ビジュアルなノードグラフで ForgeMark の UI ツリーを組み立てられる Web アプリです。
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  ForgeMark Studio              [Import .fm.md] [Export] │
+├──────┬──────────────────────────────────────┬───────────┤
+│Nodes │                                      │Properties │
+│      │  [Screen:ログイン]                    │           │
+│Screen│    └──[Card:ログインフォーム]          │ type:email│
+│Card  │         ├──[Input:email]              │ required:☑│
+│Row   │         ├──[Input:password]           │           │
+│Input │         └──[Button:サインイン]         │           │
+│Button│                                      │           │
+├──────┴──────────────────────────────────────┴───────────┤
+│  Generated ForgeMark Markdown                           │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 起動方法
+
+```bash
+npm install
+cd apps/studio
+npx vite
+# → http://localhost:5173 を開く
+```
+
+### 機能
+
+| 機能 | 説明 |
+| --- | --- |
+| **ノードパレット** | 左サイドバーからクリックでキャンバスに追加 |
+| **エッジ接続** | ノード同士をドラッグ接続して親子関係を構築 |
+| **プロパティ編集** | 右サイドバーで選択ノードの属性をフォーム編集 |
+| **Markdown生成** | 下部パネルに ForgeMark Markdown をリアルタイム表示 |
+| **Import** | `.fm.md` ファイルを読み込んでグラフ化 |
+| **Export** | グラフを `.fm.md` ファイルとして書き出し |
+
+### 技術スタック
+
+- **@xyflow/react** — ノードグラフ UI
+- **Vite + React** — ビルド & UI フレームワーク
+- **Tailwind CSS v4** — スタイリング
+- **Zustand** — グラフ状態管理
+- **@forgemark/core** — パーサー・AST（ソースを直接参照）
+
+---
+
 ## 開発
 
 ### 要件・仕様

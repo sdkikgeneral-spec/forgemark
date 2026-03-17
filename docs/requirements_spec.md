@@ -139,6 +139,43 @@ ui/
 - `###` は MenuBar の直下にある場合のみ Menu として扱う。それ以外の `###` は現在の仕様では未定義（lint 警告）。
 - `---` は Menu の直下（リストグループ間）にある場合のみ MenuSeparator として扱う。他の位置の `---` は通常の thematic break。
 
+#### Dialog（モーダルダイアログ）
+
+- `##` 見出しに `.dialog` クラスを付与すると **Dialog** ノードに昇格する。
+- 背景のインタラクションをブロックする（モーダル動作）。
+- `closable` 属性（省略時 `true`）でクローズボタンの表示を制御する。
+- `open` 属性（省略時 `false`）で初期表示状態を指定する。
+
+```markdown
+## 確認ダイアログ {.dialog .w-420 closable}
+
+本当に削除しますか？
+
+[[ [削除]{.btn .destructive on:click="dlg.close('ok')"} | [キャンセル]{.btn on:click="dlg.close('cancel')"} ]]{.row .right .gap-8}
+```
+
+- `on:click="dlg.close('...')"` のスタブ識別子は Dialog の閉じ操作として扱われる。
+- H2 の表示テキストが DialogTitle としてレンダリングされる。
+
+#### Modeless（モードレスダイアログ）
+
+- `##` 見出しに `.modeless` クラスを付与すると **Modeless** ノードに昇格する。
+- 背景のインタラクションをブロックしない（非モーダル動作）。
+- ドラッグ可能なフローティングパネルとしてレンダリングされる。
+- `resizable` 属性（省略時 `false`）でリサイズ操作の可否を制御する。
+- `closable` 属性（省略時 `true`）でクローズボタンの表示を制御する。
+
+```markdown
+## 検索パネル {.modeless .w-320 resizable}
+
+[________________]{type:text placeholder:"検索ワードを入力"}
+
+[[ [前へ]{.btn on:click="search.prev()"} | [次へ]{.btn .primary on:click="search.next()"} | [閉じる]{.btn on:click="modeless.close()"} ]]{.row .right .gap-8}
+```
+
+- Dialog と異なり、背後の画面を操作しながら利用できる。
+- `modeless.close()` のスタブ識別子は Modeless の閉じ操作として扱われる。
+
 #### イベントハンドラ属性（`on:*`）
 
 - キーは `on:` プレフィックスに続くイベント名（例: `on:click`, `on:change`, `on:submit`）。
@@ -190,6 +227,43 @@ class: .right .gap-12
 
 ---
 
+## 1.4 リモートコンポーネント参照（検討仕様）
+
+> **ステータス**: 検討中 — MVP 後のフェーズで実装予定
+
+### 概要
+
+`path` に HTTPS URL を指定することで、外部ホストの `.md` ファイルをコンポーネントとして参照できる。ファイルをローカルにコピー・配布しないため、コンポーネントの管理権限がホスト側に留まる。
+
+### URL 規則
+
+- バージョンセグメント（`v{N}` 形式）を URL パスに含めることを**必須**とする。
+- `latest` などのエイリアスは**禁止**（lint エラー）。
+
+```markdown
+```include
+path: https://forgemark.example/components/v1/FormLogin.md
+as: block
+```
+```
+
+### lintルール
+
+| 条件 | 診断レベル |
+| --- | --- |
+| HTTPS URL にバージョンセグメント（`/v{N}/`）がない | error |
+| HTTP（非TLS）での参照 | warning |
+| プレビュー時に URL へ到達不能 | warning |
+
+### 設計方針
+
+- ローカルパス（`./` 相対 or 絶対）と HTTPS URL は `path` キーで共存する。パーサは `https://` プレフィックスの有無で分岐する。
+- リモートコンテンツはプレビュー時にフェッチし、ローカルキャッシュ（ワークスペース `.forgemark/cache/`）に保存する。
+- 依存グラフのノードはリモート URL をそのまま識別子として使用する。
+- コード生成時はキャッシュ済みコンテンツを使用し、ネットワーク不要とする。
+
+---
+
 ## 2. パーサ／レンダラ仕様（MVP）
 
 ### 2.1 パース
@@ -227,6 +301,8 @@ class: .right .gap-12
 | `Menu` | `### &Label` | `id`, `label`, `accelerator`, `items: (MenuItem \| MenuSeparator)[]` |
 | `MenuItem` | `- [label]{...}` （Menu直下） | `id`, `label`, `shortcut?`, `disabled?`, `events: Record<string, string>` |
 | `MenuSeparator` | `---` （Menu直下） | `id` |
+| `Dialog` | `## label {.dialog}` | `id`, `class[]`, `dir`, `title`, `open?`, `closable?`, `children: ASTNode[]` |
+| `Modeless` | `## label {.modeless}` | `id`, `class[]`, `dir`, `title`, `closable?`, `resizable?`, `children: ASTNode[]` |
 | `Tree` | `## {.tree}` | `id`, `class[]`, `items: TreeItem[]` |
 | `TreeItem` | `- label{...}` （Tree直下・ネスト可） | `id`, `label`, `icon?`, `selected?`, `collapsed?`, `disabled?`, `events`, `children: TreeItem[]` |
 | `Panes` | `## {.panes}` | `id`, `direction: "horizontal"\|"vertical"`, `panes: Pane[]` |
@@ -347,6 +423,9 @@ class: .right .gap-12
 | Image パス未解決 | `Image source not found: {src}` | Warning |
 | Avatar `.avatar` なし | `Avatar requires '.avatar' class` | Error |
 | Divider に属性 | `Divider does not accept attributes` | Warning |
+| Dialog に `.modeless` 併用 | `Cannot use both '.dialog' and '.modeless' on the same element` | Error |
+| Dialog/Modeless に未知属性 | `Invalid attribute '{key}' for Dialog/Modeless` | Warning |
+| Modeless の `on:click="dlg.close(...)"` | `Use 'modeless.close()' instead of 'dlg.close()' inside Modeless` | Warning |
 
 ---
 
@@ -373,6 +452,8 @@ class: .right .gap-12
 - イベント：`handlers["dlg.close"]?.("ok")` などスタブ呼び出し。ファイル先頭で `handlers` プロップを受け取る型定義を生成する。
 - TypeScript：strict モード（`"strict": true`）を前提とする。
 - **MenuBar マッピング**：shadcn/ui の `Menubar` / `MenubarMenu` / `MenubarItem` / `MenubarSeparator`（`@radix-ui/react-menubar` ベース）を使用する。`shortcut` は `<MenubarShortcut>` で出力する。
+- **Dialog マッピング**：shadcn/ui の `<Dialog>` / `<DialogContent>` / `<DialogHeader>` / `<DialogTitle>` / `<DialogFooter>` を使用する。`closable` が `false` の場合は `<DialogClose>` を省略し、`onPointerDownOutside={e => e.preventDefault()}` を付与する。`open` 属性は `defaultOpen` プロップとして出力する。
+- **Modeless マッピング**：`<div class="fixed …" role="dialog" aria-modal="false">` として出力する。ドラッグはスタブコメント（`{/* TODO: drag handle */}`）を生成する。`resizable` が `true` の場合は `resize-both overflow-auto` クラスを付与する。
 
 #### ターゲット2（tailwind-plain）
 
@@ -390,6 +471,8 @@ class: .right .gap-12
 
 | ノード | next-shadcn | tailwind-plain | sveltekit |
 | --- | --- | --- | --- |
+| `Dialog` | `<Dialog>` + `<DialogContent>` + `<DialogHeader>` + `<DialogTitle>` (shadcn) | `<dialog>` HTML5要素（`open` 属性制御） | `<dialog>` 要素 |
+| `Modeless` | `<div class="fixed …">` + drag handle stub | `<div class="fixed …" role="dialog" aria-modal="false">` | `<div class="fixed …" role="dialog" aria-modal="false">` |
 | `Textarea` | `<Textarea />` (shadcn) | `<textarea>` | `<textarea>` |
 | `Range` | `<Slider />` (shadcn) | `<input type="range">` | `<input type="range">` |
 | `Combobox` | `<Combobox>` + `<Command>` (shadcn) | `<input list>` + `<datalist>` | `<input list>` + `<datalist>` |

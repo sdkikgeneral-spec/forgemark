@@ -1,0 +1,20 @@
+{
+  "name": "@forgemark/renderer",
+  "version": "0.1.0",
+  "description": "ForgeMark UI AST ビジュアルプレビューレンダラー（React + Tailwind）",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "lint": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "@forgemark/core": "*"
+  }
+}
